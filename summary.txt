@@ -1,0 +1,6 @@
+...
+
+Where I learned about NDVI and found code on how to measure it: https://github.com/planetlabs/notebooks/tree/master/jupyter-notebooks/ndvi
+
+What I would do next:
+- Mask out roads, buildings, and other infrastructure via road with either knowlege of a road database or from detection models (Crowd AI: https://www.crowdai.com/)

@@ -1,5 +1,4 @@
 #! /usr/bin/python3
-
 """
 temporal_ndvi_analysis provides a measure of change in green vegitation over time by analyzing 
 the Red and Near Infrared (NIR) bands from Planet Labs' PlanetScope 4-Band imagery. The measure of
@@ -9,6 +8,11 @@ Red and NIR bands from PlanetScore 4-band images.
 Wikipedia on NDVI: https://en.wikipedia.org/wiki/Normalized_difference_vegetation_index
 Wikipedia on NDWI: https://en.wikipedia.org/wiki/Normalized_difference_water_index
 How to compute NDVI: https://developers.planet.com/planetschool/calculate-an-ndvi-in-python/
+
+Example:
+--------
+> temporal_ndvi_analysis data_directory output_directory
+Vegitation is getting more green over time, at a rate of: (15.1 +/- 0.3) % per day.
 """
 
 import numpy as np
@@ -16,7 +20,6 @@ import argparse
 import os
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
-
 
 def validate_inputs(args):
     """
@@ -138,7 +141,6 @@ def is_image_valid(filename):
             return True
 
 
-
 def extract_data(filename):
     """
     Extracts un-normalized red and NIR band data from a PlanetScope 4-band image
@@ -171,11 +173,6 @@ def extract_data(filename):
             band_nir = src.read(4)
 
         return band_green, band_red, band_nir
-
-# class WrongDataError(Exception):
-#     def __init__(self, message = "The data does not contain all 4 bands (blue, green, red, nir). Cannot compute NDVI."):
-#         self.message = message
-#         super().__init__(self.message)
 
 
 def normalize_data(metadata_filename, band_green, band_red, band_nir):
@@ -295,7 +292,6 @@ def apply_water_mask(band_green, band_red, band_nir):
     return band_red, band_nir
 
 
-
 def measure_ndvi(band_red, band_nir):
     """
     Measures the normalized difference vegetation index (NDVI), 
@@ -373,6 +369,7 @@ def compute_rate_of_change(time, ndvi):
     # plt.plot(time[1:], np.diff(ndvi))
     # plt.show()
 
+
 class MidpointNormalize(colors.Normalize):
     """
     This class is borrowed from: https://github.com/planetlabs/notebooks/blob/master/jupyter-notebooks/ndvi/ndvi_planetscope.ipynb
@@ -392,7 +389,7 @@ class MidpointNormalize(colors.Normalize):
         return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
 
 
-def visualize_image(image):
+def visualize_image(image, output_directory):
     """
     This function is modified from: https://github.com/planetlabs/notebooks/blob/master/jupyter-notebooks/ndvi/ndvi_planetscope.ipynb
 
@@ -427,11 +424,9 @@ def visualize_image(image):
 
     ax.axis('off')
     # ax.set_title('Normalized Difference Vegetation Index', fontsize=18, fontweight='bold')
-
     cbar = fig.colorbar(cax, orientation='horizontal', shrink=0.65)
 
-    # fig.savefig("output/ndvi-fig.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
-
+    # fig.savefig(output_directory + "/ndvi-fig.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
     plt.show()
 
     # Histogram of values in image
@@ -447,9 +442,9 @@ def visualize_image(image):
     numBins = 20
     ax.hist(x,numBins,color='green',alpha=0.8)
 
-    # fig2.savefig("output/ndvi-histogram.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
-
+    # fig2.savefig(output_directory + "/ndvi-histogram.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
     plt.show()
+
 
 if __name__ == "__main__":
     
@@ -465,11 +460,11 @@ if __name__ == "__main__":
     # Ensure inputs are valid
     validate_inputs(args)
 
-    # Initialize array for incoming measurements
-    all_median_ndvi = np.zeros(len(all_dates))
-
     # Retrieve image and metadata file names, and time since their observation
     image_filenames, metadata_filenames, days_since_observation = get_data_filenames(args.data_directory)
+
+    # Initialize array for incoming measurements
+    all_median_ndvi = np.zeros(len(days_since_observation))
 
     # Cycle through each image
     for i in range(len(image_filenames)):
@@ -487,7 +482,8 @@ if __name__ == "__main__":
         ndvi = measure_ndvi(band_red, band_nir)
 
         # check range NDVI values, excluding NaN
-        print(np.nanmin(ndvi), np.nanmax(ndvi), np.nanmedian(ndvi))
+        # print(np.nanmin(ndvi), np.nanmax(ndvi), np.nanmedian(ndvi))
+        # visualize_image(image, args.output_directory)
 
         # Add measurement to array
         all_median_ndvi[i] += np.nanmedian(ndvi)

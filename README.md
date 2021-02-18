@@ -7,10 +7,9 @@ index (NDVI)](https://en.wikipedia.org/wiki/Normalized_difference_vegetation_ind
 
 ### Input arguments
 ```data_directory/```
-- The relative or absolute path to your PSScene4Band data.
-- Assume the following sub-directory structure: date/analytics_udm2/
-- Assumes the following data file name: date_3B_AnalyticsMS.tif
-- Where "date" is of the following structure: YearMonthDate_XXXXXX_XXXX
+- The relative or absolute path to your PSScene4Band data, for example: ```task/data/```.
+- Assumes the following file naming convension for the GeoTIFFs: ```YearMonthDate_XXXXXX_XXXX_3B_AnalyticMS_clip.tif```
+- Assumes the following file naming convension for the metadata: ```YearMonthDate_XXXXXX_XXXX_3B_AnalyticMS_metadata_clip.xml```
 
 ```output_directory/```
 - The relative or absolute path to the program's output figures
@@ -19,8 +18,8 @@ index (NDVI)](https://en.wikipedia.org/wiki/Normalized_difference_vegetation_ind
 To run temporal analysis on the change in green vegitation, type the following into you command line:
 
 ```bash
-> python3 main.py data_directory/ output_directory/
-|████████████████████████████████████████| 5/5 [100%] in 2:43.8 (0.03/s)
+> python3 main.py task/data/ output/
+|████████████████████████████████████████| 7/7 [100%] in 27.7s (0.25/s)
 Vegitation is getting more green over time, at a rate of: (15.1 +/- 0.3) % per day.
 ```
 

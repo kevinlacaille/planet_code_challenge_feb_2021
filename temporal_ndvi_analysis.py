@@ -189,7 +189,9 @@ def normalize_data(metadata_filename, band_green, band_red, band_nir):
 
     Parameters:
     -----------
-        metadata_filename str - The input path to a PlanetScope 4-Band metadata.
+        metadata_filename : str
+                   The input path to a PlanetScope 4-Band 
+                   image metadata.
         band_green : Array[int]
                    Un-normalized green band image.
         band_red : Array[int]
@@ -349,14 +351,18 @@ def compute_rate_of_change(time, ndvi):
     # print(np.diff(ndvi))
     # print(np.diff(time))
 
+    # Mean change in NDVI and its standard deviation
     mean_change_in_ndvi = np.mean(np.diff(ndvi))
     mean_change_in_ndvi_uncertainty = np.std(np.diff(ndvi))
 
-    mean_change_in_time = np.mean(np.diff(np.sort(time)))
-    mean_rate_of_change = mean_change_in_ndvi / mean_change_in_time
+    # Number of days in time series
+    num_days = np.max(time) - np.min(time)
+
+    # Mean rate of change in NDVI and its uncertainty
+    mean_rate_of_change = mean_change_in_ndvi / num_days
     mean_rate_of_change_uncertainty = abs((mean_change_in_ndvi_uncertainty / mean_change_in_ndvi)) * abs(mean_rate_of_change)
 
-    # Change in NDVI / day
+    # Print rate of change in NDVI per day with uncertainty
     ndvi_result_message = "(" + str(round(mean_rate_of_change * 100, 1)) + " +/- " + \
                            str(round(mean_rate_of_change_uncertainty * 100, 1)) + ") % per day"
 

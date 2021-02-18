@@ -38,7 +38,7 @@ if __name__ == "__main__":
     # Ensure inputs are valid
     validate_inputs(args)
 
-    # Retrieve image and metadata file names, and time since their observation
+    # Retrieve image and metadata file names
     image_filenames, metadata_filenames = get_data_filenames(args.data_directory)
 
     # Initialize arrays for incoming measurements

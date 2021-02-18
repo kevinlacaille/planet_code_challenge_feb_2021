@@ -1,0 +1,25 @@
+### To improve
+Given more time, here are some things that would be useful to do in order to improve the code's scalability and performance:
+
+- Find where all the maps overlay with each other. I would create a mask of the union of all of the maps and only measure NDWI and NDVI within this region.
+
+- Use the metadata.json file to:
+    - Find all anomalous pixels (```anomalous_pixels```) to mask out
+    - Compare coordinates (```coordinates```) for all images to ensure we're comparing the same regions accross the time series
+
+- Mask out roads, buildings, and other infrastructure with some combination of:
+    - A database for known roads (i.e., GRIP global [roads database](https://www.globio.info/download-grip-dataset))
+    - A database for known buildings (i.e., [This Canadian Open Database of Buildings](https://www.statcan.gc.ca/eng/lode/databases/odb))
+    - Road detection ML models (i.e., [Crowd AI](https://www.crowdai.com/))
+    - Simple roads detection models (i.e., [Detect straight roads with Hough lines via OpenCV](https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_houghlines/py_houghlines.html))
+
+
+### Notes
+I did not recieve the test data until February 18th, 2021, however I was able to put together the majority of the data ingestion and image processing pipeline from data I had previously downloaded for the project I participated in at [Planet Hack 2020](https://www.planet.com/pulse/planet-hack-2020-our-annual-hackathon-goes-virtual/). See planet_hack_2020_manifest.json for details on this data. 
+
+During this project, I learned about NDVI and NDWI measurements and how they can be used to find regions of vegetation and water, respectively. We used NDVI and NDWI to classify arctic streams. More on that [here](https://github.com/kevinlacaille/planet_hack_2020_arctic_streams).
+
+My code adopted many useful functions found in a [Planet Labs Jupyter Notebook](https://github.com/planetlabs/notebooks/tree/master/jupyter-notebooks/ndvi), which outlines how to import thier data, parse the metadata, and compute NDVI.
+
+It turned out that masking water was not needed, as there was no water in the scene. However, this fucntion didn't take much time to write and it makes the code more flexible for future cases where water may be present in the image.
+

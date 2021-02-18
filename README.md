@@ -51,9 +51,5 @@ Here are some things that would be useful to do in order to improve the code's s
     - Simple roads detection models (i.e., [Detect straight roads with Hough lines via OpenCV](https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_houghlines/py_houghlines.html))
 
 
-### Notes
-I participated in [Planet Hack 2020](https://www.planet.com/pulse/planet-hack-2020-our-annual-hackathon-goes-virtual/), where I learned about NDVI and NDWI measurements and how they can be used to find regions of vegetation and water, respectively. We used NDVI and NDWI to classify arctic streams. More on that [here](https://github.com/kevinlacaille/planet_hack_2020_arctic_streams).
-
-Code adopted many useful functions found in a [Planet Labs Jupyter Notebook](https://github.com/planetlabs/notebooks/tree/master/jupyter-notebooks/ndvi), which outlines how to import thier data, parse the metadata, and compute NDVI.
-
-It turned out that masking water was not needed, as there was no water in the scene. However, this fucntion didn't take much time to write and it makes the code more flexible for future cases where water may be present in the image.
+### Additional details
+Please see ```additional_details.txt``` for more information about my exerience with this challenge.

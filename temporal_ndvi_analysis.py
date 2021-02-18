@@ -11,7 +11,7 @@ How to compute NDVI: https://developers.planet.com/planetschool/calculate-an-ndv
 
 Example:
 --------
-> temporal_ndvi_analysis PSScene4Band output
+> python3 temporal_ndvi_analysis PSScene4Band output
 Vegitation is getting more green over time, at a rate of: (15.1 +/- 0.3) % per day.
 """
 
@@ -65,8 +65,9 @@ def get_data_filenames(data_directory):
                          All metadata file names.
     """
     
-    ## NEXT, PUT TOGETHER AUTOMATED SEARCH FOR DATA
-    # data_dir = "/home/klacaill/Documents/Github/planet_hack_2020_arctic_streams/data/BeadedStreams/AOI_1/files/PSScene4Band/"
+    # UPDATE THIS FUNCION WHEN I RECEIVE THE REAL DATA
+
+    # <HARD-CODED, WILL CHANGE>
     subdir = "analytic_udm2/"
     extension_1 = "_3B_AnalyticMS.tif"
     extension_2 = "_3B_AnalyticMS_metadata.xml"
@@ -78,6 +79,7 @@ def get_data_filenames(data_directory):
     date_5 = "20190928_211959_103d"
 
     all_dates = np.array([date_1, date_2, date_3, date_4, date_5])
+    # </HARD-CODED, WILL CHANGE>
     
     # All image file names
     image_filenames = [data_directory + date + "/" + subdir + date + extension_1 for date in all_dates]
@@ -117,7 +119,6 @@ def validate_image(image_filename):
     import rasterio
 
     valid_colours = ['blue', 'green', 'red', 'nir']
-    # Make try/catch? satements to see if data & metadata are good?
 
     with rasterio.open(image_filename) as src:
         # Check to see if all 4 bands exist
@@ -348,9 +349,6 @@ def compute_rate_of_change(time, ndvi):
         NONE
     """
 
-    # print(np.diff(ndvi))
-    # print(np.diff(time))
-
     # Mean change in NDVI and its standard deviation
     mean_change_in_ndvi = np.mean(np.diff(ndvi))
     mean_change_in_ndvi_uncertainty = np.std(np.diff(ndvi))
@@ -406,7 +404,8 @@ def visualize_image(image, image_type, output_directory):
     """
     This function is modified from: https://github.com/planetlabs/notebooks/blob/master/jupyter-notebooks/ndvi/ndvi_planetscope.ipynb
 
-    Visualizes a map.
+    Visualizes a map and plots a histogram of its values. 
+    This will be updated once data arrives.
 
     Parameters:
     -----------
@@ -478,31 +477,40 @@ if __name__ == "__main__":
     image_filenames, metadata_filenames = get_data_filenames(args.data_directory)
 
     # Initialize arrays for incoming measurements
-    all_median_ndvi = np.zeros(len(image_filenames))
-    all_days_since_acquisition = np.zeros(len(image_filenames))
+    num_images = len(image_filenames)
+    all_median_ndvi = np.zeros(num_images)
+    all_days_since_acquisition = np.zeros(num_images)
+    
+    # Setup a pretty progressbar
+    from alive_progress import alive_bar
+    with alive_bar(num_images) as bar:
+        
+        # Cycle through each image
+        for i in range(num_images):
 
-    # Cycle through each image
-    for i in range(len(image_filenames)):
+            # Extract green, red, and NIR data from 4-Band imagery        
+            band_green, band_red, band_nir, num_days_since_acquisition = extract_data(image_filenames[i], metadata_filenames[i])
 
-        # Extract green, red, and NIR data from 4-Band imagery        
-        band_green, band_red, band_nir, num_days_since_acquisition = extract_data(image_filenames[i], metadata_filenames[i])
+            # Normalize data by their reflectance coefficient
+            band_green, band_red, band_nir = normalize_data(metadata_filenames[i], band_green, band_red, band_nir)
 
-        # Normalize data by their reflectance coefficient
-        band_green, band_red, band_nir = normalize_data(metadata_filenames[i], band_green, band_red, band_nir)
+            # Mask regions with water
+            band_red, band_nir = apply_water_mask(band_green, band_red, band_nir)
 
-        # Mask regions with water
-        band_red, band_nir = apply_water_mask(band_green, band_red, band_nir)
+            # Measure NDVI in un-masked regions
+            ndvi = measure_ndvi(band_red, band_nir)
 
-        # Measure NDVI in un-masked regions
-        ndvi = measure_ndvi(band_red, band_nir)
+            # check range NDVI values, excluding NaN
+            # print(np.nanmin(ndvi), np.nanmax(ndvi), np.nanmedian(ndvi))
+            # visualize_image(image, args.output_directory)
 
-        # check range NDVI values, excluding NaN
-        # print(np.nanmin(ndvi), np.nanmax(ndvi), np.nanmedian(ndvi))
-        # visualize_image(image, args.output_directory)
+            # Add measurement to array
+            all_median_ndvi[i] += np.nanmedian(ndvi)
+            all_days_since_acquisition[i] += num_days_since_acquisition
 
-        # Add measurement to array
-        all_median_ndvi[i] += np.nanmedian(ndvi)
-        all_days_since_acquisition[i] += num_days_since_acquisition
+            # Draw progress bar
+            bar()
+
 
     # Tell me how green the vegetation has gotten!    
     compute_rate_of_change(all_days_since_acquisition, all_median_ndvi)

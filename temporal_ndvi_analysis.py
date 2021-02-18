@@ -11,7 +11,7 @@ How to compute NDVI: https://developers.planet.com/planetschool/calculate-an-ndv
 
 Example:
 --------
-> temporal_ndvi_analysis data_directory output_directory
+> temporal_ndvi_analysis PSScene4Band output
 Vegitation is getting more green over time, at a rate of: (15.1 +/- 0.3) % per day.
 """
 
@@ -63,13 +63,8 @@ def get_data_filenames(data_directory):
                          All image file names.
         metadata_filenames : List[str]
                          All metadata file names.
-        days_since_observation : List[int]
-                         Number of days from observation date
-                         until today.
     """
     
-    from datetime import datetime
-
     ## NEXT, PUT TOGETHER AUTOMATED SEARCH FOR DATA
     # data_dir = "/home/klacaill/Documents/Github/planet_hack_2020_arctic_streams/data/BeadedStreams/AOI_1/files/PSScene4Band/"
     subdir = "analytic_udm2/"
@@ -84,14 +79,6 @@ def get_data_filenames(data_directory):
 
     all_dates = np.array([date_1, date_2, date_3, date_4, date_5])
     
-    all_time = [date.split("_")[0] for date in all_dates]
-
-    # Current date
-    today = datetime.now()
-
-    # Number of days since observation
-    days_since_observation = [(today - datetime.strptime(time, '%Y%m%d')).days for time in all_time]
-
     # All image file names
     image_filenames = [data_directory + date + "/" + subdir + date + extension_1 for date in all_dates]
 
@@ -110,45 +97,48 @@ def get_data_filenames(data_directory):
         metadata_that_dont_exist = metadata_filenames[np.where(np.array(does_metadata_exist) == False)[0][0]]
         raise Exception("Cannot find the following files:", metadata_that_dont_exist)
     
+    return image_filenames, metadata_filenames
 
-    return image_filenames, metadata_filenames, days_since_observation
 
-
-def is_image_valid(filename):
+def validate_image(image_filename):
     """
     Ensures that the the given PlanetScope image is a valid image
 
     Parameters:
     -----------
-        filename : str
-                   The input path to a PlanetScope 4-Band image.
+        image_filename : str
+                         The input path to a PlanetScope 4-Band image.
     
     Returns:
     --------
-        boolean
+        is_image_valid : bool
+                         A flag which returns True if the image is valid.
     """
     import rasterio
 
     valid_colours = ['blue', 'green', 'red', 'nir']
     # Make try/catch? satements to see if data & metadata are good?
 
-    with rasterio.open(filename) as src:
+    with rasterio.open(image_filename) as src:
         # Check to see if all 4 bands exist
         if not any([colour in src.descriptions for colour in valid_colours]):
             raise Exception("The data does not contain all 4 bands (blue, green, red, nir). Cannot compute NDVI.")
         else:
             src.close()
-            return True
+            is_image_valid = True
+            return is_image_valid
 
 
-def extract_data(filename):
+def extract_data(image_filename, metadata_filename):
     """
     Extracts un-normalized red and NIR band data from a PlanetScope 4-band image
 
     Parameters:
     -----------
-        filename : str
+        image_filename : str
                    The input path to a PlanetScope 4-Band image.
+        metadata_filename : str
+                   The input path to a PlanetScope 4-Band image metadata.
     
     Returns:
     --------
@@ -156,23 +146,40 @@ def extract_data(filename):
                    Red band image.
         band_nir : Array[int]
                    NIR band image.
+        num_days_since_acquisition : int
+                   Number of days since acquisition
+                   from today.
     """
 
+    from xml.dom import minidom
+    from datetime import datetime
     import rasterio
 
-    # Extract green, red, and NIR data from PlanetScope 4-band imagery
-    if is_image_valid(filename):
+    # Extract acquisition date from metadata
+    xmldoc = minidom.parse(metadata_filename)
+    acquisition_date = xmldoc.getElementsByTagName("ps:acquisitionDateTime")[0].firstChild.data
 
-        with rasterio.open(filename) as src:
+    # Current date
+    today = datetime.now()
+    # Number of days since acquisition    
+    num_days_since_acquisition = (today - datetime.strptime(acquisition_date.split("T")[0], '%Y-%m-%d')).days
+
+    if num_days_since_acquisition < 0:
+        raise Exception("Number of days since acquisition for", image_filename, "is < 0. Metadata may be corrupt.")
+
+    # Extract green, red, and NIR data from PlanetScope 4-band imagery
+    if validate_image(image_filename):
+
+        with rasterio.open(image_filename) as src:
             band_green = src.read(2)
 
-        with rasterio.open(filename) as src:
+        with rasterio.open(image_filename) as src:
             band_red = src.read(3)
 
-        with rasterio.open(filename) as src:
+        with rasterio.open(image_filename) as src:
             band_nir = src.read(4)
 
-        return band_green, band_red, band_nir
+        return band_green, band_red, band_nir, num_days_since_acquisition
 
 
 def normalize_data(metadata_filename, band_green, band_red, band_nir):
@@ -207,7 +214,7 @@ def normalize_data(metadata_filename, band_green, band_red, band_nir):
     xmldoc = minidom.parse(metadata_filename)
 
     nodes = xmldoc.getElementsByTagName("ps:bandSpecificMetadata")
-
+    
     if nodes.length != 4:
         raise Exception("The data does not contain all 4 bands (blue, green, red, nir). Cannot compute NDVI.")
 
@@ -350,21 +357,21 @@ def compute_rate_of_change(time, ndvi):
     mean_rate_of_change_uncertainty = abs((mean_change_in_ndvi_uncertainty / mean_change_in_ndvi)) * abs(mean_rate_of_change)
 
     # Change in NDVI / day
-    ndvi_result_message = "(" + str(round(mean_rate_of_change * 100, 1)) + "+/-" + \
+    ndvi_result_message = "(" + str(round(mean_rate_of_change * 100, 1)) + " +/- " + \
                            str(round(mean_rate_of_change_uncertainty * 100, 1)) + ") % per day"
 
     print("Average change in NDVI / day:", ndvi_result_message)
 
     # Print findings
     if mean_rate_of_change_uncertainty >= abs(mean_rate_of_change):
-        print("Vegitation is not statistically getting greener nor less green over time.")
+        print("Vegetation is not statistically getting greener nor less green over time.")
     else:
         if mean_rate_of_change < 0:
-            print("Vegitation is getting less green over time, at a rate of:", ndvi_result_message)
+            print("Vegetation is getting less green over time, at a rate of:", ndvi_result_message)
         elif mean_rate_of_change > 0:
-            print("Vegitation is getting more green over time, at a rate of:", ndvi_result_message)
+            print("Vegetation is getting more green over time, at a rate of:", ndvi_result_message)
         else:
-            print("Vegitation is neither getting greener nor getting less green over time!")
+            print("Vegetation is neither getting greener nor getting less green over time!")
 
     # plt.plot(time[1:], np.diff(ndvi))
     # plt.show()
@@ -389,7 +396,7 @@ class MidpointNormalize(colors.Normalize):
         return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
 
 
-def visualize_image(image, output_directory):
+def visualize_image(image, image_type, output_directory):
     """
     This function is modified from: https://github.com/planetlabs/notebooks/blob/master/jupyter-notebooks/ndvi/ndvi_planetscope.ipynb
 
@@ -413,6 +420,7 @@ def visualize_image(image, output_directory):
     max_range = np.nanmax(image)
     mid_range = np.mean([min_range, max_range])
 
+    # Map
     fig = plt.figure(figsize=(20,10))
     ax = fig.add_subplot(111)
 
@@ -423,10 +431,10 @@ def visualize_image(image, output_directory):
                     norm=MidpointNormalize(midpoint=mid_range,vmin=min_range, vmax=max_range))
 
     ax.axis('off')
-    # ax.set_title('Normalized Difference Vegetation Index', fontsize=18, fontweight='bold')
-    cbar = fig.colorbar(cax, orientation='horizontal', shrink=0.65)
+    ax.set_title(image_type, fontsize=18, fontweight='bold')
+    fig.colorbar(cax, orientation='horizontal', shrink=0.65)
 
-    # fig.savefig(output_directory + "/ndvi-fig.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
+    fig.savefig(output_directory + "/" + image_type + "-fig.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
     plt.show()
 
     # Histogram of values in image
@@ -442,15 +450,15 @@ def visualize_image(image, output_directory):
     numBins = 20
     ax.hist(x,numBins,color='green',alpha=0.8)
 
-    # fig2.savefig(output_directory + "/ndvi-histogram.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
+    fig2.savefig(output_directory + "/" + image_type + "-histogram.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
     plt.show()
 
 
 if __name__ == "__main__":
     
     # Parse inputs
-    parser = argparse.ArgumentParser(description='Measure the change in green vegitation \
-                                                  using the Normalized Difference Vegitation Index (NDVI)')
+    parser = argparse.ArgumentParser(description='Measure the change in green vegetation \
+                                                  using the Normalized Difference vegetation Index (NDVI)')
     parser.add_argument('data_directory', type=str, help='Input directory to data. \
                                                           Expected data type: PSScene4Band GeoTIFFs.')
     parser.add_argument('output_directory', type=str, help='Output directory for image. \
@@ -461,16 +469,17 @@ if __name__ == "__main__":
     validate_inputs(args)
 
     # Retrieve image and metadata file names, and time since their observation
-    image_filenames, metadata_filenames, days_since_observation = get_data_filenames(args.data_directory)
+    image_filenames, metadata_filenames = get_data_filenames(args.data_directory)
 
-    # Initialize array for incoming measurements
-    all_median_ndvi = np.zeros(len(days_since_observation))
+    # Initialize arrays for incoming measurements
+    all_median_ndvi = np.zeros(len(image_filenames))
+    all_days_since_acquisition = np.zeros(len(image_filenames))
 
     # Cycle through each image
     for i in range(len(image_filenames)):
 
         # Extract green, red, and NIR data from 4-Band imagery        
-        band_green, band_red, band_nir = extract_data(image_filenames[i])
+        band_green, band_red, band_nir, num_days_since_acquisition = extract_data(image_filenames[i], metadata_filenames[i])
 
         # Normalize data by their reflectance coefficient
         band_green, band_red, band_nir = normalize_data(metadata_filenames[i], band_green, band_red, band_nir)
@@ -487,6 +496,7 @@ if __name__ == "__main__":
 
         # Add measurement to array
         all_median_ndvi[i] += np.nanmedian(ndvi)
+        all_days_since_acquisition[i] += num_days_since_acquisition
 
-    # Tell me how green the vegitation has gotten!    
-    compute_rate_of_change(days_since_observation, all_median_ndvi)
+    # Tell me how green the vegetation has gotten!    
+    compute_rate_of_change(all_days_since_acquisition, all_median_ndvi)

@@ -1,25 +1,25 @@
 #! /usr/bin/python3
 """
-temporal_ndvi_analysis provides a measure of change in green vegitation over time by analyzing 
-the Red and Near Infrared (NIR) bands from Planet Labs' PlanetScope 4-Band imagery. The measure of
-green vegitation is provided by the normalized difference vegetation index (NDVI)
-Red and NIR bands from PlanetScore 4-band images.
+A group of functions which aid in the measurements of the change in 
+normalized difference vegetation index (NDVI) over time, using 
+Planet Labs' PlanetScope 4-Band imagery.
 
-Wikipedia on NDVI: https://en.wikipedia.org/wiki/Normalized_difference_vegetation_index
-Wikipedia on NDWI: https://en.wikipedia.org/wiki/Normalized_difference_water_index
-How to compute NDVI: https://developers.planet.com/planetschool/calculate-an-ndvi-in-python/
+Author
+------
+Kevin Lacaille
 
-Example:
+See Also
 --------
-> python3 temporal_ndvi_analysis PSScene4Band output
-Vegitation is getting more green over time, at a rate of: (15.1 +/- 0.3) % per day.
+midpoint
+main
+
+References
+----------
+Planet's notebook on importing & parsing data and measuring NDVI: https://github.com/planetlabs/notebooks/tree/master/jupyter-notebooks/ndvi
 """
 
 import numpy as np
-import argparse
 import os
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors
 
 def validate_inputs(args):
     """
@@ -65,9 +65,8 @@ def get_data_filenames(data_directory):
                          All metadata file names.
     """
     
-    # UPDATE THIS FUNCION WHEN I RECEIVE THE REAL DATA
-
-    # <HARD-CODED, WILL CHANGE>
+    ## NEXT, PUT TOGETHER AUTOMATED SEARCH FOR DATA
+    # data_dir = "/home/klacaill/Documents/Github/planet_hack_2020_arctic_streams/data/BeadedStreams/AOI_1/files/PSScene4Band/"
     subdir = "analytic_udm2/"
     extension_1 = "_3B_AnalyticMS.tif"
     extension_2 = "_3B_AnalyticMS_metadata.xml"
@@ -79,7 +78,6 @@ def get_data_filenames(data_directory):
     date_5 = "20190928_211959_103d"
 
     all_dates = np.array([date_1, date_2, date_3, date_4, date_5])
-    # </HARD-CODED, WILL CHANGE>
     
     # All image file names
     image_filenames = [data_directory + date + "/" + subdir + date + extension_1 for date in all_dates]
@@ -119,6 +117,7 @@ def validate_image(image_filename):
     import rasterio
 
     valid_colours = ['blue', 'green', 'red', 'nir']
+    # Make try/catch? satements to see if data & metadata are good?
 
     with rasterio.open(image_filename) as src:
         # Check to see if all 4 bands exist
@@ -242,7 +241,6 @@ def measure_ndwi(band_green, band_nir):
     """
     Measures the normalized difference water index (NDWI), 
     defined as: NDVI = (NIR - red) / (NIR + red).
-    See more: https://en.wikipedia.org/wiki/Normalized_difference_water_index
 
     Parameters:
     -----------
@@ -255,6 +253,10 @@ def measure_ndwi(band_green, band_nir):
     --------
         ndwi : float
                Normalized difference water index
+
+    See Also:
+    ---------
+    https://en.wikipedia.org/wiki/Normalized_difference_water_index
     """
 
     # Allow division by zero
@@ -319,6 +321,10 @@ def measure_ndvi(band_red, band_nir):
     --------
         ndvi : float
                Normalized difference vegetation index
+
+    See Also:
+    ---------
+    https://en.wikipedia.org/wiki/Normalized_difference_vegetation_index
     """
 
     # Allow division by zero
@@ -348,6 +354,9 @@ def compute_rate_of_change(time, ndvi):
     --------
         NONE
     """
+
+    # print(np.diff(ndvi))
+    # print(np.diff(time))
 
     # Mean change in NDVI and its standard deviation
     mean_change_in_ndvi = np.mean(np.diff(ndvi))
@@ -381,31 +390,11 @@ def compute_rate_of_change(time, ndvi):
     # plt.show()
 
 
-class MidpointNormalize(colors.Normalize):
-    """
-    This class is borrowed from: https://github.com/planetlabs/notebooks/blob/master/jupyter-notebooks/ndvi/ndvi_planetscope.ipynb
-
-    Normalise the colorbar so that diverging bars work there way either side from a prescribed midpoint value)
-    e.g. im=ax1.imshow(array, norm=MidpointNormalize(midpoint=0.,vmin=-100, vmax=100))
-    Credit: Joe Kington, http://chris35wills.github.io/matplotlib_diverging_colorbar/
-    """
-    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
-        self.midpoint = midpoint
-        colors.Normalize.__init__(self, vmin, vmax, clip)
-
-    def __call__(self, value, clip=None):
-        # I'm ignoring masked values and all kinds of edge cases to make a
-        # simple example...
-        x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
-        return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
-
-
 def visualize_image(image, image_type, output_directory):
     """
     This function is modified from: https://github.com/planetlabs/notebooks/blob/master/jupyter-notebooks/ndvi/ndvi_planetscope.ipynb
 
-    Visualizes a map and plots a histogram of its values. 
-    This will be updated once data arrives.
+    Visualizes a map.
 
     Parameters:
     -----------
@@ -419,6 +408,10 @@ def visualize_image(image, image_type, output_directory):
         ndvi : float
                Normalized difference vegetation index
     """
+
+    import matplotlib.pyplot as plt
+    from midpoint import MidpointNormalize
+
     # Set min/max values from NDVI range for image (excluding NAN)
     # set midpoint according to how NDVI is interpreted: https://earthobservatory.nasa.gov/Features/MeasuringVegetation/
     min_range = np.nanmin(image)
@@ -451,66 +444,9 @@ def visualize_image(image, image_type, output_directory):
     plt.ylabel("# pixels", fontsize=14)
 
 
-    x = ndvi[~np.isnan(ndvi)]
+    x = image[~np.isnan(image)]
     numBins = 20
     ax.hist(x,numBins,color='green',alpha=0.8)
 
     fig2.savefig(output_directory + "/" + image_type + "-histogram.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
     plt.show()
-
-
-if __name__ == "__main__":
-    
-    # Parse inputs
-    parser = argparse.ArgumentParser(description='Measure the change in green vegetation \
-                                                  using the Normalized Difference vegetation Index (NDVI)')
-    parser.add_argument('data_directory', type=str, help='Input directory to data. \
-                                                          Expected data type: PSScene4Band GeoTIFFs.')
-    parser.add_argument('output_directory', type=str, help='Output directory for image. \
-                                                            Output images and figures.')
-    args = parser.parse_args()
-
-    # Ensure inputs are valid
-    validate_inputs(args)
-
-    # Retrieve image and metadata file names, and time since their observation
-    image_filenames, metadata_filenames = get_data_filenames(args.data_directory)
-
-    # Initialize arrays for incoming measurements
-    num_images = len(image_filenames)
-    all_median_ndvi = np.zeros(num_images)
-    all_days_since_acquisition = np.zeros(num_images)
-    
-    # Setup a pretty progressbar
-    from alive_progress import alive_bar
-    with alive_bar(num_images) as bar:
-        
-        # Cycle through each image
-        for i in range(num_images):
-
-            # Extract green, red, and NIR data from 4-Band imagery        
-            band_green, band_red, band_nir, num_days_since_acquisition = extract_data(image_filenames[i], metadata_filenames[i])
-
-            # Normalize data by their reflectance coefficient
-            band_green, band_red, band_nir = normalize_data(metadata_filenames[i], band_green, band_red, band_nir)
-
-            # Mask regions with water
-            band_red, band_nir = apply_water_mask(band_green, band_red, band_nir)
-
-            # Measure NDVI in un-masked regions
-            ndvi = measure_ndvi(band_red, band_nir)
-
-            # check range NDVI values, excluding NaN
-            # print(np.nanmin(ndvi), np.nanmax(ndvi), np.nanmedian(ndvi))
-            # visualize_image(image, args.output_directory)
-
-            # Add measurement to array
-            all_median_ndvi[i] += np.nanmedian(ndvi)
-            all_days_since_acquisition[i] += num_days_since_acquisition
-
-            # Draw progress bar
-            bar()
-
-
-    # Tell me how green the vegetation has gotten!    
-    compute_rate_of_change(all_days_since_acquisition, all_median_ndvi)

@@ -1,6 +1,6 @@
 To run temporal analysis on the change in green vegitation, type the following into you command line:
 
-temporal_ndvi_analysis.py data_directory output_directory
+> python3 temporal_ndvi_analysis.py data_directory output_directory
 
 data_directory
 - The relative or absolute path to your PSScene4Band data.

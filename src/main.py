@@ -69,7 +69,7 @@ if __name__ == "__main__":
             # Visualize the NDVI maps
             visualize_image(ndvi, "NDVI", image_filenames[i], args.output_directory)
 
-            # Measure the proportions of baren dirt and vegetation in maps
+            # Measure the proportions of barren dirt and vegetation in maps
             proportion_dirt, proportion_veg = measure_dirt_veg_proportions(ndvi)
 
             # Add measurement to array

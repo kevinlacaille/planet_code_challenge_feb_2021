@@ -377,7 +377,7 @@ def compute_rate_of_change(time, ndvi, proportion_dirt, proportion_veg, image_fi
     # Print proportions of dirt and veg over time series
     print("Over the time series, between " + str(round(np.min(proportion_dirt) * 100, 2)) + \
           "% (" + min_dirt_date + ") and " +  str(round(np.max(proportion_dirt) * 100, 2)) + \
-          "% (" + max_dirt_date + ") of the region contained baren dirt.")
+          "% (" + max_dirt_date + ") of the region contained barren dirt.")
     print("Over the time series, between " + str(round(np.min(proportion_veg) * 100, 2)) + \
           "% (" + min_veg_date + ") and " +  str(round(np.max(proportion_veg) * 100, 2)) + \
           "% (" + max_veg_date + ") of the region contained vegetation.")
@@ -489,7 +489,7 @@ def visualize_image(image, image_name, image_filename, output_directory):
 
 def measure_dirt_veg_proportions(ndvi):
     """
-    Measures the proportion of baren dirt pixels and vegegation 
+    Measures the proportion of barren dirt pixels and vegegation 
     pixels to the total number of pixels in the image.
 
     Parameters:

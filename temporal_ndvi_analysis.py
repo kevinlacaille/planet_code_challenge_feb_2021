@@ -438,14 +438,13 @@ def visualize_image(image, image_name, image_filename, output_directory):
     from midpoint import MidpointNormalize
     import os
 
-    # Set min/max values from NDVI range for image (excluding NAN)
-    # set midpoint according to how NDVI is interpreted: https://earthobservatory.nasa.gov/Features/MeasuringVegetation/
+    # Set min/max values from pixel intensity (excluding NAN)
     min_range = np.nanmin(image)
     max_range = np.nanmax(image)
     mid_range = np.mean([min_range, max_range])
 
-    # Ensure image_filename is just the file name
-    image_filename = image_filename.split("/")[-1].split("_")[0]
+    # Ensure image_filename is just the date
+    image_date = image_filename.split("/")[-1].split("_")[0]
 
     # Map
     fig = plt.figure(figsize=(20,10))
@@ -461,7 +460,7 @@ def visualize_image(image, image_name, image_filename, output_directory):
     ax.set_title(image_name, fontsize=18, fontweight='bold')
     fig.colorbar(cax, orientation='horizontal', shrink=0.65)
 
-    fig.savefig(os.path.join(output_directory, image_filename + "-" + image_name + "-fig.png"), \
+    fig.savefig(os.path.join(output_directory, image_date + "-" + image_name + "-fig.png"), \
                 dpi=200, bbox_inches='tight', pad_inches=0.7)
     # plt.show()
     plt.close()
@@ -479,15 +478,83 @@ def visualize_image(image, image_name, image_filename, output_directory):
     NUM_BINS = 20
     ax.hist(x,NUM_BINS,color='green',alpha=0.8)
 
+    # Place a line at the median to help see where the value is coming from
     plt.axvline(x = np.nanmedian(image))
 
-    fig2.savefig(os.path.join(output_directory, image_filename + "-" + image_name + "-histogram.png"), \
+    fig2.savefig(os.path.join(output_directory, image_date + "-" + image_name + "-histogram.png"), \
                  dpi=200, bbox_inches='tight', pad_inches=0.7)
     # plt.show()
     plt.close()
 
 
-def visualize_data(time, ndvi):
+def measure_dirt_veg_proportions(ndvi):
+    """
+    Measures the proportion of baren dirt pixels and vegegation 
+    pixels to the total number of pixels in the image.
+
+    Parameters:
+    -----------
+        ndvi : Array[float]
+               The median NDVI values over the entire region
+               at the given acquisition date.
+    Returns:
+    --------
+        proportion_dirt : Array[float]
+                Ratio of the total number of pixels containing 
+                dirt to the total number of pixels in the scene.
+        proportion_veg : Array[float]
+                Ratio of the total number of pixels containing 
+                vegetation to the total number of pixels in the scene.        
+    """    
+
+    # See additional_notes.md for these values
+    # Assume 0 <= NDVI <= 0.3 for dirt
+    MIN_DIRT_INDEX = 0
+    MAX_DIRT_INDEX = 0.3
+    # Assume 0.3 < NDVI <= 1.0 for vegetation
+    MIN_VEG_INDEX = 0.3
+
+    # Remove all nans for the future calculations
+    ndvi = ndvi[~np.isnan(ndvi)]
+
+    # Total number of pixels in the scene
+    num_pixels = np.size(ndvi)
+
+    # Compute ratios
+    proportion_dirt = len(np.where((ndvi >= MIN_DIRT_INDEX) & (ndvi <= MAX_DIRT_INDEX))[0]) / float(num_pixels)
+    proportion_veg = len(np.where(ndvi > MIN_VEG_INDEX)[0]) / float(num_pixels)
+
+    return proportion_dirt, proportion_veg
+
+
+def visualize_data(time, ndvi, proportion_dirt, proportion_veg, output_directory):
+    """
+    Visualizes how the NDVI changes over time.
+
+    Parameters:
+    -----------
+        time : Array[float]
+               The time from today to the acquisition date.
+        ndvi : Array[float]
+               The median NDVI values over the entire region
+               at the given acquisition date.
+        proportion_dirt : Array[float]
+                Time series ratio of the total number of pixels containing 
+                dirt to the total number of pixels in the scene.
+        proportion_veg : Array[float]
+                Time series ratio of the total number of pixels containing 
+                vegetation to the total number of pixels in the scene.        
+        output_directory : str
+                The path to a directory to output figures to.
+    
+    Returns:
+    --------
+        NONE
+    """
+
+    mean_ndvi = np.mean(ndvi)
+    mean_change_in_ndvi = np.mean(np.diff(ndvi))
+    mean_change_in_ndvi_uncertainty = np.std(np.diff(ndvi))
 
     import matplotlib.pyplot as plt
 
@@ -495,14 +562,37 @@ def visualize_data(time, ndvi):
     time = time - np.min(time)
 
     # NDVI vs. time
-    fig3 = plt.figure(figsize=(10,10))
-    ax = fig3.add_subplot(111)
+    fig3 = plt.figure()
+    fig3.add_subplot(111)
 
     plt.title("NDVI time series", fontsize=18, fontweight='bold')
-    plt.xlabel("time (days from initial acquisition)", fontsize=14)
-    plt.ylabel("median NDVI values", fontsize=14)
+    plt.xlabel("Time (days from initial acquisition)", fontsize=14)
+    plt.ylabel("Median NDVI values", fontsize=14)
 
-    plt.plot(time, ndvi)
+    plt.plot(time, ndvi, label='_nolegend_')
 
-    # fig3.savefig(output_directory + "/" + image_name + "-histogram.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
-    plt.show()
+    # The average NDVI over time
+    plt.plot(time, mean_change_in_ndvi * np.ones(len(time)) + mean_ndvi, "k-")
+    plt.plot(time, (mean_change_in_ndvi + mean_change_in_ndvi_uncertainty)* np.ones(len(time)) + mean_ndvi, "g--")
+    plt.plot(time, (mean_change_in_ndvi - mean_change_in_ndvi_uncertainty) * np.ones(len(time)) + mean_ndvi, "r--")
+
+    plt.legend(["Mean", r"+1 $\sigma$", r"-1 $\sigma$"])
+    fig3.savefig(output_directory + "/temporal-NDVI.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
+    # plt.show()
+
+
+    # Proportions of dirt & veg vs. time
+    fig4 = plt.figure()
+    fig4.add_subplot(111)
+
+    plt.title("Proportions of dirt and vegetation", fontsize=18, fontweight='bold')
+    plt.xlabel("Time (days from initial acquisition)", fontsize=14)
+    plt.ylabel("Number of px / total px", fontsize=14)
+
+    plt.plot(time, proportion_dirt, 'brown')
+    plt.plot(time, proportion_veg, 'green')
+
+    plt.legend(["Dirt", "Vegetation"])
+
+    fig4.savefig(output_directory + "/temporal-dirt-veg-proportions.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
+    # plt.show()

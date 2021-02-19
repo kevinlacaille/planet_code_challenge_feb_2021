@@ -19,7 +19,7 @@ See Also:
 temporal_ndvi_analysis
 """
 
-from temporal_ndvi_analysis import validate_inputs, get_data_filenames, extract_data, normalize_data, apply_water_mask, measure_ndvi, visualize_image, visualize_data, compute_rate_of_change
+from temporal_ndvi_analysis import validate_inputs, get_data_filenames, extract_data, normalize_data, apply_water_mask, measure_ndvi, visualize_image, measure_dirt_veg_proportions, visualize_data, compute_rate_of_change
 import numpy as np
 import argparse
 from alive_progress import alive_bar
@@ -66,15 +66,11 @@ if __name__ == "__main__":
             # Measure NDVI in un-masked regions
             ndvi = measure_ndvi(band_red, band_nir)
 
-            ndvi = ndvi[~np.isnan(ndvi)]
-            num_pixels = np.size(ndvi)
-            proportion_dirt = len(np.where((ndvi >= 0) & (ndvi <= 0.3))[0]) / float(num_pixels)
-            proportion_veg = len(np.where(ndvi > 0.3)[0]) / float(num_pixels)
-            a = np.where(ndvi > 0.2)[0]
+            # Visualize the NDVI maps
+            visualize_image(ndvi, "NDVI", image_filenames[i], args.output_directory)
 
-            # check range NDVI values, excluding NaN
-            # print(np.nanmin(ndvi), np.nanmax(ndvi), np.nanmedian(ndvi))
-            # visualize_image(ndvi, "NDVI", image_filenames[i], args.output_directory)
+            # Measure the proportions of baren dirt and vegetation in maps
+            proportion_dirt, proportion_veg = measure_dirt_veg_proportions(ndvi)
 
             # Add measurement to array
             all_median_ndvi[i] += np.nanmedian(ndvi)
@@ -93,7 +89,7 @@ if __name__ == "__main__":
     all_proportion_veg = all_proportion_veg[sorting_index]
 
     # Visualize the change in NDVI
-    # visualize_data(all_days_since_acquisition, all_median_ndvi, all_proportion_dirt, all_proportion_veg))
+    visualize_data(all_days_since_acquisition, all_median_ndvi, all_proportion_dirt, all_proportion_veg, args.output_directory)
 
     # Tell me how green the vegetation has gotten!    
     compute_rate_of_change(all_days_since_acquisition, all_median_ndvi, all_proportion_dirt, all_proportion_veg, image_filenames)

@@ -12,7 +12,7 @@ index (NDVI)](https://en.wikipedia.org/wiki/Normalized_difference_vegetation_ind
 - Assumes the following file naming convention for the metadata: ```YearMonthDate_XXXXXX_XXXX_3B_AnalyticMS_metadata_clip.xml```
 
 ```output_directory/```
-- The relative or absolute path to the program's output figures, for example: ```../outputs/`
+- The relative or absolute path to the program's output figures, for example: ```../outputs/```
 
 ### Run the code!
 To run this temporal NDVI analysis on your data, type the following into you command line:

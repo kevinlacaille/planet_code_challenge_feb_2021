@@ -65,25 +65,19 @@ def get_data_filenames(data_directory):
                          All metadata file names.
     """
     
-    ## NEXT, PUT TOGETHER AUTOMATED SEARCH FOR DATA
-    # data_dir = "/home/klacaill/Documents/Github/planet_hack_2020_arctic_streams/data/BeadedStreams/AOI_1/files/PSScene4Band/"
-    subdir = "analytic_udm2/"
-    extension_1 = "_3B_AnalyticMS.tif"
-    extension_2 = "_3B_AnalyticMS_metadata.xml"
+    from glob import glob
 
-    date_1 = "20190927_211921_1018"
-    date_2 = "20190927_211922_1018"
-    date_3 = "20190927_211923_1018"
-    date_4 = "20190928_211958_103d"
-    date_5 = "20190928_211959_103d"
-
-    all_dates = np.array([date_1, date_2, date_3, date_4, date_5])
-    
     # All image file names
-    image_filenames = [data_directory + date + "/" + subdir + date + extension_1 for date in all_dates]
+    image_filenames = glob(data_directory + "/*AnalyticMS*.tif")
 
     # All metadate file names
-    metadata_filenames = [data_directory + date + "/" + subdir + date + extension_2 for date in all_dates]
+    metadata_filenames = glob(data_directory + "/*AnalyticMS_metadata*.xml")
+
+    # Make sure image and metadata files are loaded
+    if not image_filenames:
+        raise Exception("Data directory does not seem to contain AnalyticsMS GeoTIFFs.")
+    if not metadata_filenames:
+        raise Exception("Data directory does not seem to contain AnalyticsMS XML metadata.")
 
     # Make sure all image files exist
     does_image_exist = [os.path.isfile(file) for file in image_filenames]
@@ -100,33 +94,32 @@ def get_data_filenames(data_directory):
     return image_filenames, metadata_filenames
 
 
-def validate_image(image_filename):
+def validate_data(image_filename):
     """
     Ensures that the the given PlanetScope image is a valid image
 
     Parameters:
     -----------
         image_filename : str
-                         The input path to a PlanetScope 4-Band image.
+                        The input path to a PlanetScope 4-Band image.
     
     Returns:
     --------
-        is_image_valid : bool
-                         A flag which returns True if the image is valid.
+        is_data_valid : bool
+                        A flag which returns True if the image is valid.
     """
     import rasterio
 
-    valid_colours = ['blue', 'green', 'red', 'nir']
-    # Make try/catch? satements to see if data & metadata are good?
+    NUM_CHANNELS = 4
 
     with rasterio.open(image_filename) as src:
         # Check to see if all 4 bands exist
-        if not any([colour in src.descriptions for colour in valid_colours]):
+        if len(src.indexes) != NUM_CHANNELS:
             raise Exception("The data does not contain all 4 bands (blue, green, red, nir). Cannot compute NDVI.")
         else:
             src.close()
-            is_image_valid = True
-            return is_image_valid
+            is_data_valid = True
+            return is_data_valid
 
 
 def extract_data(image_filename, metadata_filename):
@@ -168,7 +161,7 @@ def extract_data(image_filename, metadata_filename):
         raise Exception("Number of days since acquisition for", image_filename, "is < 0. Metadata may be corrupt.")
 
     # Extract green, red, and NIR data from PlanetScope 4-band imagery
-    if validate_image(image_filename):
+    if validate_data(image_filename):
 
         with rasterio.open(image_filename) as src:
             band_green = src.read(2)
@@ -217,7 +210,9 @@ def normalize_data(metadata_filename, band_green, band_red, band_nir):
 
     nodes = xmldoc.getElementsByTagName("ps:bandSpecificMetadata")
     
-    if nodes.length != 4:
+    NUM_CHANNELS = 4
+
+    if nodes.length != NUM_CHANNELS:
         raise Exception("The data does not contain all 4 bands (blue, green, red, nir). Cannot compute NDVI.")
 
     # XML parser refers to bands by numbers 1-4
@@ -336,7 +331,7 @@ def measure_ndvi(band_red, band_nir):
     return ndvi
 
 
-def compute_rate_of_change(time, ndvi):
+def compute_rate_of_change(time, ndvi, proportion_dirt, proportion_veg, image_filenames):
     """
     Computes the average rate of change of the NDVI over
     time by measuring the mean change in NDVI per day.
@@ -349,14 +344,43 @@ def compute_rate_of_change(time, ndvi):
         ndvi : Array[int]
                Normalized difference vegetation
                index per day.
+        proportion_dirt : Array[float]
+               The proportion of pixels containing 
+               dirt to total number of pixels, in
+               the image.
+        proportion_veg : Array[float]
+               The proportion of pixels containing 
+               vegetation to total number of pixels,
+               in the image.
     
     Returns:
     --------
         NONE
     """
 
-    # print(np.diff(ndvi))
-    # print(np.diff(time))
+    # Ensure image_filename is just the file name
+    image_dates = [image_filename.split("/")[-1].split("_")[0] for image_filename in image_filenames]
+
+    # Find the dates with min and max dirt & veg (assumes only 1 min and max exists)
+    min_dirt_date = image_dates[np.where(proportion_dirt == np.min(proportion_dirt))[0][0]]
+    min_dirt_date = min_dirt_date[0:4] + "-" + min_dirt_date[4:6] + "-" + min_dirt_date[6:]
+
+    max_dirt_date = image_dates[np.where(proportion_dirt == np.max(proportion_dirt))[0][0]]
+    max_dirt_date = max_dirt_date[0:4] + "-" + max_dirt_date[4:6] + "-" + max_dirt_date[6:]
+
+    min_veg_date = image_dates[np.where(proportion_veg == np.min(proportion_veg))[0][0]]
+    min_veg_date = min_veg_date[0:4] + "-" + min_veg_date[4:6] + "-" + min_veg_date[6:]
+
+    max_veg_date = image_dates[np.where(proportion_veg == np.max(proportion_veg))[0][0]]
+    max_veg_date = max_veg_date[0:4] + "-" + max_veg_date[4:6] + "-" + max_veg_date[6:]
+
+    # Print proportions of dirt and veg over time series
+    print("Over the time series, between " + str(round(np.min(proportion_dirt) * 100, 2)) + \
+          "% (" + min_dirt_date + ") and " +  str(round(np.max(proportion_dirt) * 100, 2)) + \
+          "% (" + max_dirt_date + ") of the region contained baren dirt.")
+    print("Over the time series, between " + str(round(np.min(proportion_veg) * 100, 2)) + \
+          "% (" + min_veg_date + ") and " +  str(round(np.max(proportion_veg) * 100, 2)) + \
+          "% (" + max_veg_date + ") of the region contained vegetation.")
 
     # Mean change in NDVI and its standard deviation
     mean_change_in_ndvi = np.mean(np.diff(ndvi))
@@ -370,27 +394,24 @@ def compute_rate_of_change(time, ndvi):
     mean_rate_of_change_uncertainty = abs((mean_change_in_ndvi_uncertainty / mean_change_in_ndvi)) * abs(mean_rate_of_change)
 
     # Print rate of change in NDVI per day with uncertainty
-    ndvi_result_message = "(" + str(round(mean_rate_of_change * 100, 1)) + " +/- " + \
-                           str(round(mean_rate_of_change_uncertainty * 100, 1)) + ") % per day"
+    ndvi_result_message = "(" + str(round(mean_rate_of_change * 100, 2)) + " +/- " + \
+                           str(round(mean_rate_of_change_uncertainty * 100, 2)) + ") % per day"
 
-    print("Average change in NDVI / day:", ndvi_result_message)
-
-    # Print findings
+    # Print findings - Entire time averaging
     if mean_rate_of_change_uncertainty >= abs(mean_rate_of_change):
-        print("Vegetation is not statistically getting greener nor less green over time.")
+        print("Average change in NDVI / day:", ndvi_result_message)
+        print("Greenness of the vegetation changed over time, however, over the entire time series, " \
+              "the vegetation did not statistically get greener nor less green over time.")
     else:
         if mean_rate_of_change < 0:
-            print("Vegetation is getting less green over time, at a rate of:", ndvi_result_message)
+            print("Over the entire time series, vegetation is getting less green over time, at a rate of:", ndvi_result_message)
         elif mean_rate_of_change > 0:
-            print("Vegetation is getting more green over time, at a rate of:", ndvi_result_message)
+            print("Over the entire time series, vegetation is getting more green over time, at a rate of:", ndvi_result_message)
         else:
-            print("Vegetation is neither getting greener nor getting less green over time!")
-
-    # plt.plot(time[1:], np.diff(ndvi))
-    # plt.show()
+            print("Over the entire time series, vegetation is neither getting greener nor getting less green over time!")
 
 
-def visualize_image(image, image_type, output_directory):
+def visualize_image(image, image_name, image_filename, output_directory):
     """
     This function is modified from: https://github.com/planetlabs/notebooks/blob/master/jupyter-notebooks/ndvi/ndvi_planetscope.ipynb
 
@@ -398,25 +419,33 @@ def visualize_image(image, image_type, output_directory):
 
     Parameters:
     -----------
-        band_red : Array[int]
-               Normalized red band image.
-        band_nir : Array[int]
-               Normalized NIR band image.
+        image : Array[int]
+                An image, such as NDVI, Green Band, Red Band, 
+                or NIR Band.
+        image_name : str
+                The name of the image.
+        image_filename : str
+                The input path to a PlanetScope 4-Band image.
+        output_directory : str
+                The path to a directory to output figures to.
     
     Returns:
     --------
-        ndvi : float
-               Normalized difference vegetation index
+        NONE
     """
 
     import matplotlib.pyplot as plt
     from midpoint import MidpointNormalize
+    import os
 
     # Set min/max values from NDVI range for image (excluding NAN)
     # set midpoint according to how NDVI is interpreted: https://earthobservatory.nasa.gov/Features/MeasuringVegetation/
     min_range = np.nanmin(image)
     max_range = np.nanmax(image)
     mid_range = np.mean([min_range, max_range])
+
+    # Ensure image_filename is just the file name
+    image_filename = image_filename.split("/")[-1].split("_")[0]
 
     # Map
     fig = plt.figure(figsize=(20,10))
@@ -429,11 +458,14 @@ def visualize_image(image, image_type, output_directory):
                     norm=MidpointNormalize(midpoint=mid_range,vmin=min_range, vmax=max_range))
 
     ax.axis('off')
-    ax.set_title(image_type, fontsize=18, fontweight='bold')
+    ax.set_title(image_name, fontsize=18, fontweight='bold')
     fig.colorbar(cax, orientation='horizontal', shrink=0.65)
 
-    fig.savefig(output_directory + "/" + image_type + "-fig.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
-    plt.show()
+    fig.savefig(os.path.join(output_directory, image_filename + "-" + image_name + "-fig.png"), \
+                dpi=200, bbox_inches='tight', pad_inches=0.7)
+    # plt.show()
+    plt.close()
+
 
     # Histogram of values in image
     fig2 = plt.figure(figsize=(10,10))
@@ -443,10 +475,34 @@ def visualize_image(image, image_type, output_directory):
     plt.xlabel("NDVI values", fontsize=14)
     plt.ylabel("# pixels", fontsize=14)
 
-
     x = image[~np.isnan(image)]
-    numBins = 20
-    ax.hist(x,numBins,color='green',alpha=0.8)
+    NUM_BINS = 20
+    ax.hist(x,NUM_BINS,color='green',alpha=0.8)
 
-    fig2.savefig(output_directory + "/" + image_type + "-histogram.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
+    plt.axvline(x = np.nanmedian(image))
+
+    fig2.savefig(os.path.join(output_directory, image_filename + "-" + image_name + "-histogram.png"), \
+                 dpi=200, bbox_inches='tight', pad_inches=0.7)
+    # plt.show()
+    plt.close()
+
+
+def visualize_data(time, ndvi):
+
+    import matplotlib.pyplot as plt
+
+    # Normalize time by initial acquisition
+    time = time - np.min(time)
+
+    # NDVI vs. time
+    fig3 = plt.figure(figsize=(10,10))
+    ax = fig3.add_subplot(111)
+
+    plt.title("NDVI time series", fontsize=18, fontweight='bold')
+    plt.xlabel("time (days from initial acquisition)", fontsize=14)
+    plt.ylabel("median NDVI values", fontsize=14)
+
+    plt.plot(time, ndvi)
+
+    # fig3.savefig(output_directory + "/" + image_name + "-histogram.png", dpi=200, bbox_inches='tight', pad_inches=0.7)
     plt.show()

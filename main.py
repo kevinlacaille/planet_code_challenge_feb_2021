@@ -11,7 +11,7 @@ Kevin Lacaille
 
 Example:
 --------
-> python3 main.py PSScene4Band output
+> python3 main.py task/data/ output/
 Vegitation is getting more green over time, at a rate of: (15.1 +/- 0.3) % per day.
 
 See Also:
@@ -19,7 +19,7 @@ See Also:
 temporal_ndvi_analysis
 """
 
-from temporal_ndvi_analysis import validate_inputs, get_data_filenames, extract_data, normalize_data, apply_water_mask, measure_ndvi, visualize_image, compute_rate_of_change
+from temporal_ndvi_analysis import validate_inputs, get_data_filenames, extract_data, normalize_data, apply_water_mask, measure_ndvi, visualize_image, visualize_data, compute_rate_of_change
 import numpy as np
 import argparse
 from alive_progress import alive_bar
@@ -43,6 +43,8 @@ if __name__ == "__main__":
 
     # Initialize arrays for incoming measurements
     num_images = len(image_filenames)
+    all_proportion_dirt = np.zeros(num_images)
+    all_proportion_veg = np.zeros(num_images)
     all_median_ndvi = np.zeros(num_images)
     all_days_since_acquisition = np.zeros(num_images)
     
@@ -64,16 +66,34 @@ if __name__ == "__main__":
             # Measure NDVI in un-masked regions
             ndvi = measure_ndvi(band_red, band_nir)
 
+            ndvi = ndvi[~np.isnan(ndvi)]
+            num_pixels = np.size(ndvi)
+            proportion_dirt = len(np.where((ndvi >= 0) & (ndvi <= 0.3))[0]) / float(num_pixels)
+            proportion_veg = len(np.where(ndvi > 0.3)[0]) / float(num_pixels)
+            a = np.where(ndvi > 0.2)[0]
+
             # check range NDVI values, excluding NaN
             # print(np.nanmin(ndvi), np.nanmax(ndvi), np.nanmedian(ndvi))
-            visualize_image(ndvi, "NDVI", args.output_directory)
+            # visualize_image(ndvi, "NDVI", image_filenames[i], args.output_directory)
 
             # Add measurement to array
             all_median_ndvi[i] += np.nanmedian(ndvi)
+            all_proportion_dirt[i] += proportion_dirt
+            all_proportion_veg[i] += proportion_veg
             all_days_since_acquisition[i] += num_days_since_acquisition
 
             # Draw progress bar
             bar()
+    
+    # Sort the data by date
+    sorting_index = np.argsort(all_days_since_acquisition)
+    all_days_since_acquisition = all_days_since_acquisition[sorting_index]
+    all_median_ndvi = all_median_ndvi[sorting_index]
+    all_proportion_dirt = all_proportion_dirt[sorting_index]
+    all_proportion_veg = all_proportion_veg[sorting_index]
+
+    # Visualize the change in NDVI
+    # visualize_data(all_days_since_acquisition, all_median_ndvi, all_proportion_dirt, all_proportion_veg))
 
     # Tell me how green the vegetation has gotten!    
-    compute_rate_of_change(all_days_since_acquisition, all_median_ndvi)
+    compute_rate_of_change(all_days_since_acquisition, all_median_ndvi, all_proportion_dirt, all_proportion_veg, image_filenames)

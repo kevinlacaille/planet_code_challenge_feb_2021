@@ -13,6 +13,9 @@ Given more time, here are some things that would be useful to do in order to imp
     - Road detection ML models (i.e., [Crowd AI](https://www.crowdai.com/))
     - Simple roads detection models (i.e., [Detect straight roads with Hough lines via OpenCV](https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_houghlines/py_houghlines.html))
 
+- To improve speed, I could make the output directory optional, along with an optional flag to tell the code whether or not to output data.
+
+- Intead of measuring the average change of NDVI over the entire time series, it could be useful to fit a function to the data and report back how the NDVI changes over time (perhaps a modified sine wave, or something more physical).
 
 ### Notes
 #### How did I determine greenness?

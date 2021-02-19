@@ -19,8 +19,12 @@ To run temporal analysis on the change in green vegitation, type the following i
 
 ```bash
 > python3 main.py task/data/ output/
-|████████████████████████████████████████| 7/7 [100%] in 27.7s (0.25/s)
-Vegitation is getting more green over time, at a rate of: (15.1 +/- 0.3) % per day.
+|████████████████████████████████████████| 7/7 [100%] in 24.9s (0.28/s)
+Over the time series, between 0.02% (2020-08-26) and 3.75% (2020-07-01) of the region contained baren dirt.
+Over the time series, between 96.25% (2020-07-01) and 99.98% (2020-08-26) of the region contained vegetation.
+Average change in NDVI / day: (0.0 +/- 0.12) % per day
+Greenness of the vegetation changed over time, however, over the entire time series, the vegetation did not statistically get greener nor less green over time.
+
 ```
 
 ### High-level flowchart
@@ -34,21 +38,6 @@ Extract bands from images &rarr; Normalize data &rarr; Mask out regions with wat
 
 4) Compute rate of change of green vegitation
 5) Return how green the vegetation has gotten over time
-
-### To improve
-Here are some things that would be useful to do in order to improve the code's scalability and performance:
-
-- Use the metadata.json file to:
-    - Find all anomalous pixels (```anomalous_pixels```) to mask out
-    - Compare coordinates (```coordinates```) for all images to ensure we're comparing the same regions accross the time series
-    - Create a mask the is the union of all usable regions (where all of the maps overlap), and only measure within this region
-
-- Mask out roads, buildings, and other infrastructure with some combination of:
-    - A database for known roads (i.e., GRIP global [roads database](https://www.globio.info/download-grip-dataset))
-    - A database for known buildings (i.e., [This Canadian Open Database of Buildings](https://www.statcan.gc.ca/eng/lode/databases/odb))
-    - Road detection ML models (i.e., [Crowd AI](https://www.crowdai.com/))
-    - Simple roads detection models (i.e., [Detect straight roads with Hough lines via OpenCV](https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_houghlines/py_houghlines.html))
-
 
 ### Additional details
 Please see ```additional_details.txt``` for more information about my exerience with this challenge.

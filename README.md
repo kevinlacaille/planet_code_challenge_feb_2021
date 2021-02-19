@@ -39,5 +39,9 @@ Extract bands from images &rarr; Normalize data &rarr; Mask out regions with wat
 4) Compute rate of change of green vegitation compared to baren soil
 5) Return how green the vegetation has gotten over time
 
+### Main result
+Since the mean change in NDVI over the entire time series was appriximetly zero and its standard deviation was >>0, I can conclude that the greenness of 
+green vegetation changed over time, however, over the entire time series, the vegetation did not statistically get greener nor less green over time.
+
 ### Additional details
 Please see ```additional_details.md``` for more information about my exerience with this challenge.
